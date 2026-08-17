@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Pitcher and his Catchers — Season Progression</title>
+<style>
+  .viz-root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page:           #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --grid:           #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --series-1:       #2a78d6;
+    --line-muted:     #c9c8bf;
+    --good:           #006300;
+    --bad:            #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page:           #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --grid:           #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --series-1:       #3987e5;
+      --line-muted:     #3f3f3c;
+      --good:           #0ca30c;
+      --bad:            #e66767;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --page:           #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --grid:           #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --series-1:       #3987e5;
+    --line-muted:     #3f3f3c;
+    --good:           #0ca30c;
+    --bad:            #e66767;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; overflow-x: hidden; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--page);
+    color: var(--text-primary);
+  }
+  .viz-root { max-width: 460px; margin: 0 auto; padding: 16px 14px 44px; }
+
+  header.top { margin-bottom: 16px; }
+  header.top .row1 { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  header.top h1 { font-size: 18px; font-weight: 650; margin: 0 0 4px; line-height: 1.25; }
+  header.top p { margin: 0; color: var(--text-secondary); font-size: 12px; }
+  #themeToggle {
+    border: 1px solid var(--border); background: var(--surface-1); color: var(--text-secondary);
+    border-radius: 8px; padding: 8px 10px; font-size: 11.5px; cursor: pointer; white-space: nowrap; flex: none;
+  }
+
+  .kpi-row {
+    display: flex; overflow-x: auto; gap: 9px; margin-bottom: 18px; padding-bottom: 6px;
+    scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch;
+  }
+  .kpi-row::-webkit-scrollbar { height: 4px; }
+  .kpi-tile {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 11px 12px; flex: 0 0 180px; scroll-snap-align: start;
+  }
+  .kpi-tile .label { font-size: 10.5px; color: var(--text-muted); margin-bottom: 5px; }
+  .kpi-tile .value { font-size: 15.5px; font-weight: 650; line-height: 1.25; }
+  .kpi-tile .sub { font-size: 11px; color: var(--text-secondary); margin-top: 3px; }
+  .kpi-tile .sub.good { color: var(--good); }
+  .kpi-tile .sub.bad { color: var(--bad); }
+
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 14px 14px; margin-bottom: 16px;
+  }
+  .card h2 { font-size: 14px; font-weight: 650; margin: 0 0 3px; }
+  .card p.desc { margin: 0 0 12px; font-size: 11.5px; color: var(--text-secondary); line-height: 1.45; }
+  .card p.hint { margin: 8px 0 0; font-size: 10.5px; color: var(--text-muted); }
+
+  .chart-wrap { position: relative; }
+  svg.chart { width: 100%; height: auto; display: block; overflow: visible; touch-action: pan-y; }
+  svg.chart .hit-area { touch-action: none; }
+  .gridline { stroke: var(--grid); stroke-width: 1; shape-rendering: crispEdges; }
+  .axis-line { stroke: var(--baseline); stroke-width: 1; shape-rendering: crispEdges; }
+  .axis-label { fill: var(--text-muted); font-size: 9.5px; }
+  .crosshair { stroke: var(--baseline); stroke-width: 1; pointer-events: none; opacity: 0; }
+  .series-line { fill: none; stroke: var(--line-muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: stroke .12s, opacity .12s, stroke-width .12s; }
+  .series-line.active { stroke: var(--series-1); stroke-width: 2.5; }
+  .series-line.dim { opacity: .32; }
+  .end-dot { fill: var(--series-1); stroke: var(--surface-1); stroke-width: 2; opacity: 0; transition: opacity .12s; }
+  .end-dot.show { opacity: 1; }
+  .end-label { fill: var(--text-primary); font-size: 11px; font-weight: 600; opacity: 0; transition: opacity .12s; }
+  .end-label.show { opacity: 1; }
+
+  .legend {
+    display: flex; flex-direction: column; gap: 2px; margin-top: 14px;
+    border-top: 1px solid var(--border); padding-top: 10px;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 9px; padding: 9px 8px; border-radius: 8px; min-height: 40px;
+    cursor: pointer; font-size: 13px; color: var(--text-secondary); border: none; background: none;
+    text-align: left; width: 100%; font-family: inherit; -webkit-tap-highlight-color: transparent;
+  }
+  .legend-item:active { background: var(--grid); }
+  .legend-item.pinned { color: var(--text-primary); font-weight: 650; background: var(--grid); }
+  .legend-key { width: 16px; height: 2px; background: var(--line-muted); flex: none; border-radius: 1px; }
+  .legend-item.pinned .legend-key { background: var(--series-1); height: 2.5px; }
+  .legend-rank { font-variant-numeric: tabular-nums; color: var(--text-muted); font-size: 11px; width: 22px; flex: none; }
+
+  .tooltip {
+    position: absolute; pointer-events: none; background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; font-size: 11.5px; box-shadow: 0 4px 16px rgba(0,0,0,0.16);
+    opacity: 0; transition: opacity .1s; z-index: 5; max-width: 248px;
+  }
+  .tooltip.show { opacity: 1; }
+  .tooltip .t-title { font-weight: 650; margin-bottom: 5px; color: var(--text-primary); font-size: 11.5px; }
+  .tooltip .t-row { display: flex; align-items: center; gap: 6px; padding: 1.5px 0; }
+  .tooltip .t-key { width: 9px; height: 2px; flex: none; }
+  .tooltip .t-name { color: var(--text-secondary); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tooltip .t-val { font-weight: 650; color: var(--text-primary); font-variant-numeric: tabular-nums; flex: none; white-space: nowrap; }
+  .tooltip .t-row.hi .t-name { color: var(--text-primary); font-weight: 650; }
+
+  .heatmap-flex { display: flex; }
+  .heatmap-labels { flex: none; width: 96px; padding-top: 0; }
+  .heat-label-row { height: 25px; display: flex; align-items: center; font-size: 10.5px; color: var(--text-secondary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .heatmap-scroll { flex: 1; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .heatmap-grid { display: grid; grid-auto-flow: column; }
+  .heat-cell { width: 25px; height: 25px; border: 2px solid var(--surface-1); box-sizing: border-box; }
+  .heatmap-periods { display: flex; margin-left: 96px; margin-top: 4px; }
+  .heatmap-periods-scroll { display: flex; overflow: hidden; flex: 1; }
+  .heat-p-label { width: 25px; flex: none; font-size: 9px; color: var(--text-muted); text-align: center; }
+
+  .scale-legend { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 10.5px; color: var(--text-muted); }
+  .scale-bar { width: 100px; height: 8px; border-radius: 4px; flex: none; }
+
+  .bar-row { display: flex; align-items: center; min-height: 34px; padding: 4px 0; }
+  .bar-label { width: 108px; flex: none; font-size: 11.5px; color: var(--text-secondary); text-align: right; padding-right: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-track { flex: 1; position: relative; height: 14px; }
+  .bar-fill { position: absolute; left: 0; top: 0; height: 14px; background: var(--series-1); border-radius: 0 4px 4px 0; }
+  .bar-value { margin-left: 7px; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--text-primary); font-weight: 600; width: 40px; flex: none; }
+
+  details.table-toggle { margin-top: 12px; }
+  details.table-toggle summary { cursor: pointer; font-size: 11.5px; color: var(--text-secondary); padding: 4px 0; }
+  table.data-table { border-collapse: collapse; width: 100%; margin-top: 8px; font-size: 10.5px; display: block; overflow-x: auto; white-space: nowrap; }
+  table.data-table th, table.data-table td { border-bottom: 1px solid var(--border); padding: 5px 7px; text-align: right; font-variant-numeric: tabular-nums; }
+  table.data-table th:first-child, table.data-table td:first-child { text-align: left; font-variant-numeric: normal; position: sticky; left: 0; background: var(--surface-1); }
+  table.data-table th { color: var(--text-muted); font-weight: 600; font-size: 10px; }
+
+  .rec-card p { font-size: 12.5px; color: var(--text-secondary); line-height: 1.55; margin: 0 0 9px; }
+  .rec-card p b { color: var(--text-primary); }
+
+  footer.note { font-size: 10.5px; color: var(--text-muted); margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="viz-root" id="vizRoot">
+
+  <header class="top">
+    <div class="row1">
+      <div>
+        <h1>Pitcher and his Catchers</h1>
+        <p>Season progression · 18 scoring periods</p>
+      </div>
+      <button id="themeToggle" type="button">Dark</button>
+    </div>
+  </header>
+
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <section class="card">
+    <h2>Standings progression</h2>
+    <p class="desc">Cumulative points each week (W + 0.5×T). Tap the chart to inspect a week; tap a team below to pin it.</p>
+    <div class="chart-wrap">
+      <svg class="chart" id="chartStandings" viewBox="0 0 380 260" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="tooltip" id="tipStandings"></div>
+    </div>
+    <div class="legend" id="legendStandings"></div>
+    <details class="table-toggle">
+      <summary>View as table</summary>
+      <div id="tableStandings"></div>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>Weekly form</h2>
+    <p class="desc">Points earned each single week — darker is a bigger week. Swipe sideways to see all 18 weeks. Tap a cell for detail.</p>
+    <div class="chart-wrap">
+      <div class="heatmap-flex">
+        <div class="heatmap-labels" id="heatLabels"></div>
+        <div class="heatmap-scroll" id="heatScroll">
+          <div class="heatmap-grid" id="heatGrid"></div>
+        </div>
+      </div>
+      <div class="heatmap-periods">
+        <div class="heatmap-periods-scroll" id="heatPeriods"></div>
+      </div>
+      <div class="tooltip" id="tipHeat"></div>
+    </div>
+    <div class="scale-legend">
+      <span>Low</span>
+      <div class="scale-bar" style="background: linear-gradient(to right, #cde2fb, #256abf);"></div>
+      <span>High</span>
+    </div>
+    <details class="table-toggle">
+      <summary>View as table</summary>
+      <div id="tableHeat"></div>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>League rank by week</h2>
+    <p class="desc">1st–10th place after each week. Tap the chart to inspect; tap a team below to pin it.</p>
+    <div class="chart-wrap">
+      <svg class="chart" id="chartRank" viewBox="0 0 380 280" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="tooltip" id="tipRank"></div>
+    </div>
+    <div class="legend" id="legendRank"></div>
+    <details class="table-toggle">
+      <summary>View as table</summary>
+      <div id="tableRank"></div>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>Weekly consistency</h2>
+    <p class="desc">Std. deviation of weekly points — lower means steadier week to week; higher means bigger boom/bust swings.</p>
+    <div class="chart-wrap">
+      <div id="barRows"></div>
+      <div class="tooltip" id="tipBar"></div>
+    </div>
+    <details class="table-toggle">
+      <summary>View as table</summary>
+      <div id="tableBar"></div>
+    </details>
+  </section>
+
+  <section class="card rec-card">
+    <h2>Recommendations</h2>
+    <div id="recText"></div>
+    <footer class="note">Built from the uploaded Fantrax standings export, scoring periods 1–18. Playoffs excluded (no results yet at export time).</footer>
+  </section>
+
+</div>
+
+<script id="seasonData" type="application/json">
+{"teams": ["1899 Cleveland Spiders", "Bungo", "CardinalsRow", "Funky Butt Loving", "Juiced Balls and Corked Bats", "Seantjml", "SlickyRicky2000", "Twill03", "You\u2019re Killing Me Smalls", "YungGawd"], "n_periods": 18, "cum": {"1899 Cleveland Spiders": {"period": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], "cumPts": [5.0, 9.0, 15.0, 19.0, 25.5, 29.5, 32.5, 37.5, 42.5, 48.5, 52.0, 58.0, 66.5, 73.5, 80.0, 89.0, 98.0, 107.0], "cumW": [5.0, 9.0, 15.0, 19.0, 25.0, 29.0, 31.0, 36.0, 41.0, 47.0, 50.0, 56.0, 64.0, 71.0, 77.0, 86.0, 95.0, 104.0], "cumL": [5.0, 11.0, 15.0, 21.0, 24.0, 30.0, 36.0, 41.0, 46.0, 50.0, 56.0, 60.0, 61.0, 64.0, 67.0, 68.0, 69.0, 70.0], "cumT": [0, 0, 0, 0, 1.0, 1.0, 3.0, 3.0, 3.0, 3.0, 4.0, 4.0, 5.0, 5.0, 6.0, 6.0, 6.0, 6.0], "weeklyPts": [5.0, 4.0, 6.0, 4.0, 6.5, 4.0, 3.0, 5.0, 5.0, 6.0, 3.5, 6.0, 8.5, 7.0, 6.5, 9.0, 9.0, 9.0], "rank": [5, 7, 5, 5, 4, 6, 6, 6, 6, 6, 7, 7, 4, 3, 2, 2, 2, 2]}, "Bungo": {"period": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], "cumPts": [4.0, 10.5, 13.0, 19.0, 22.0, 24.5, 30.5, 37.5, 39.5, 42.5, 46.5, 51.5, 53.0, 57.0, 65.0, 68.0, 73.5, 82.5], "cumW": [4.0, 10.0, 12.0, 18.0, 21.0, 23.0, 29.0, 36.0, 38.0, 41.0, 45.0, 50.0, 51.0, 55.0, 63.0, 66.0, 71.0, 80.0], "cumL": [6.0, 9.0, 16.0, 20.0, 27.0, 34.0, 38.0, 41.0, 49.0, 56.0, 62.0, 67.0, 75.0, 81.0, 83.0, 90.0, 94.0, 95.0], "cumT": [0, 1.0, 2.0, 2.0, 2.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 4.0, 4.0, 4.0, 4.0, 5.0, 5.0], "weeklyPts": [4.0, 6.5, 2.5, 6.0, 3.0, 2.5, 6.0, 7.0, 2.0, 3.0, 4.0, 5.0, 1.5, 4.0, 8.0, 3.0, 5.5, 9.0], "rank": [8, 5, 9, 6, 7, 8, 7, 7, 9, 9, 10, 9, 9, 9, 9, 9, 9, 7]}, "CardinalsRow": {"period": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], "cumPts": [6.0, 11.0, 20.0, 27.5, 37.0, 43.0, 48.5, 56.5, 60.0, 67.0, 74.0, 80.5, 86.5, 89.0, 92.5, 95.0, 103.0, 111.5], "cumW": [6.0, 11.0, 20.0, 27.0, 36.0, 42.0, 47.0, 55.0, 58.0, 65.0, 72.0, 78.0, 84.0, 86.0, 89.0, 91.0, 99.0, 107.0], "cumL": [4.0, 9.0, 10.0, 12.0, 12.0, 16.0, 20.0, 22.0, 28.0, 31.0, 34.0, 37.0, 41.0, 48.0, 54.0, 61.0, 63.0, 64.0], "cumT": [0, 0, 0, 1.0, 2.0, 2.0, 3.0, 3.0, 4.0, 4.0, 4.0, 5.0, 5.0, 6.0, 7.0, 8.0, 8.0, 9.0], "weeklyPts": [6.0, 5.0, 9.0, 7.5, 9.5, 6.0, 5.5, 8.0, 3.5, 7.0, 7.0, 6.5, 6.0, 2.5, 3.5, 2.5, 8.0, 8.5], "rank": [3, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]}, "Funky Butt Loving": {"period": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], "cumPts": [6.5, 12.5, 15.0, 22.0, 25.0, 32.5, 40.5, 42.5, 46.5, 52.5, 59.0, 63.0, 71.5, 76.5, 78.5, 87.5, 89.5, 95.0], "cumW": [5.0, 11.0, 13.0, 20.0, 23.0, 30.0, 38.0, 40.0, 44.0, 50.0, 56.0, 60.0, 68.0, 73.0, 75.0, 84.0, 86.0, 91.0], "cumL": [2.0, 6.0, 13.0, 16.0, 23.0, 25.0, 27.0, 35.0, 41.0, 45.0, 48.0, 54.0, 55.0, 60.0, 68.0, 69.0, 77.0, 81.0], "cumT": [3.0, 3.0, 4.0, 4.0, 4.0, 5.0, 5.0, 5.0, 5.0, 5.0, 6.0, 6.0, 7.0, 7.0, 7.0, 7.0, 7.0, 8.0], "weeklyPts": [6.5, 6.0, 2.5, 7.0, 3.0, 7.5, 8.0, 2.0, 4.0, 6.0, 6.5, 4.0, 8.5, 5.0, 2.0, 9.0, 2.0, 5.5], "rank": [1, 2, 6, 4, 5, 3, 2, 3, 4, 3, 2, 2, 2, 2, 4, 3, 5, 4]}, "Juiced Balls and Corked Bats": {"period": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], "cumPts": [5.5, 12.5, 13.5, 16.5, 22.0, 31.0, 37.0, 40.0, 45.0, 49.5, 57.5, 61.0, 62.5, 69.0, 72.0, 76.0, 80.5, 81.5], "cumW": [5.0, 11.0, 12.0, 15.0, 20.0, 29.0, 35.0, 38.0, 43.0, 47.0, 55.0, 58.0, 59.0, 65.0, 67.0, 70.0, 74.0, 75.0], "cumL": [4.0, 6.0, 15.0, 22.0, 26.0, 27.0, 31.0, 38.0, 43.0, 48.0, 50.0, 56.0, 64.0, 67.0, 73.0, 78.0, 83.0, 92.0], "cumT": [1.0, 3.0, 3.0, 3.0, 4.0, 4.0, 4.0, 4.0, 4.0, 5.0, 5.0, 6.0, 7.0, 8.0, 10.0, 12.0, 13.0, 13.0], "weeklyPts": [5.5, 7.0, 1.0, 3.0, 5.5, 9.0, 6.0, 3.0, 5.0, 4.5, 8.0, 3.5, 1.5, 6.5, 3.0, 4.0, 4.5, 1.0], "rank": [4, 3, 8, 9, 8, 5, 3, 5, 5, 5, 3, 4, 7, 6, 7, 7, 7, 8]}, "Seantjml": {"period": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], "cumPts": [3.5, 6.5, 14.0, 17.5, 18.0, 23.5, 27.5, 32.5, 35.5, 39.5, 47.5, 52.5, 62.5, 70.0, 78.0, 84.0, 85.0, 87.0], "cumW": [2.0, 5.0, 12.0, 15.0, 15.0, 20.0, 24.0, 29.0, 32.0, 36.0, 44.0, 49.0, 59.0, 66.0, 74.0, 79.0, 80.0, 82.0], "cumL": [5.0, 12.0, 14.0, 20.0, 29.0, 33.0, 39.0, 44.0, 51.0, 57.0, 59.0, 64.0, 64.0, 66.0, 68.0, 71.0, 80.0, 88.0], "cumT": [3.0, 3.0, 4.0, 5.0, 6.0, 7.0, 7.0, 7.0, 7.0, 7.0, 7.0, 7.0, 7.0, 8.0, 8.0, 10.0, 10.0, 10.0], "weeklyPts": [3.5, 3.0, 7.5, 3.5, 0.5, 5.5, 4.0, 5.0, 3.0, 4.0, 8.0, 5.0, 10.0, 7.5, 8.0, 6.0, 1.0, 2.0], "rank": [9, 10, 7, 8, 9, 9, 10, 9, 10, 10, 9, 8, 8, 5, 5, 5, 6, 6]}, "SlickyRicky2000": {"period": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], "cumPts": [3.5, 7.0, 10.5, 13.0, 17.5, 22.0, 29.0, 34.5, 40.5, 47.5, 53.5, 61.5, 65.5, 69.0, 71.0, 72.0, 75.0, 79.5], "cumW": [3.0, 6.0, 9.0, 11.0, 15.0, 19.0, 25.0, 30.0, 36.0, 42.0, 48.0, 56.0, 60.0, 63.0, 65.0, 66.0, 69.0, 73.0], "cumL": [6.0, 12.0, 18.0, 25.0, 30.0, 35.0, 37.0, 41.0, 45.0, 47.0, 51.0, 53.0, 59.0, 65.0, 73.0, 82.0, 89.0, 94.0], "cumT": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 9.0, 9.0, 11.0, 11.0, 11.0, 11.0, 12.0, 12.0, 12.0, 12.0, 13.0], "weeklyPts": [3.5, 3.5, 3.5, 2.5, 4.5, 4.5, 7.0, 5.5, 6.0, 7.0, 6.0, 8.0, 4.0, 3.5, 2.0, 1.0, 3.0, 4.5], "rank": [10, 9, 10, 10, 10, 10, 9, 8, 7, 7, 6, 3, 5, 7, 8, 8, 8, 9]}, "Twill03": {"period": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], "cumPts": [4.5, 9.5, 16.0, 22.5, 26.0, 28.5, 30.5, 32.5, 40.5, 46.0, 49.0, 51.0, 51.0, 54.0, 58.0, 59.0, 61.0, 62.0], "cumW": [4.0, 9.0, 15.0, 21.0, 24.0, 26.0, 28.0, 30.0, 38.0, 43.0, 46.0, 48.0, 48.0, 51.0, 54.0, 55.0, 57.0, 58.0], "cumL": [5.0, 10.0, 13.0, 16.0, 22.0, 29.0, 37.0, 45.0, 47.0, 51.0, 58.0, 66.0, 76.0, 83.0, 88.0, 97.0, 105.0, 114.0], "cumT": [1.0, 1.0, 2.0, 3.0, 4.0, 5.0, 5.0, 5.0, 5.0, 6.0, 6.0, 6.0, 6.0, 6.0, 8.0, 8.0, 8.0, 8.0], "weeklyPts": [4.5, 5.0, 6.5, 6.5, 3.5, 2.5, 2.0, 2.0, 8.0, 5.5, 3.0, 2.0, 0.0, 3.0, 4.0, 1.0, 2.0, 1.0], "rank": [7, 6, 3, 3, 3, 7, 8, 10, 8, 8, 8, 10, 10, 10, 10, 10, 10, 10]}, "You\u2019re Killing Me Smalls": {"period": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], "cumPts": [5.0, 8.0, 15.5, 18.0, 25.0, 32.5, 37.0, 41.5, 48.5, 52.5, 54.5, 60.5, 67.5, 73.5, 79.5, 87.0, 94.0, 102.0], "cumW": [5.0, 7.0, 14.0, 16.0, 23.0, 30.0, 34.0, 38.0, 45.0, 49.0, 51.0, 57.0, 64.0, 70.0, 75.0, 82.0, 89.0, 97.0], "cumL": [5.0, 11.0, 13.0, 20.0, 23.0, 25.0, 30.0, 35.0, 38.0, 44.0, 52.0, 56.0, 59.0, 63.0, 66.0, 68.0, 71.0, 73.0], "cumT": [0, 2.0, 3.0, 4.0, 4.0, 5.0, 6.0, 7.0, 7.0, 7.0, 7.0, 7.0, 7.0, 7.0, 9.0, 10.0, 10.0, 10.0], "weeklyPts": [5.0, 3.0, 7.5, 2.5, 7.0, 7.5, 4.5, 4.5, 7.0, 4.0, 2.0, 6.0, 7.0, 6.0, 6.0, 7.5, 7.0, 8.0], "rank": [6, 8, 4, 7, 6, 4, 4, 4, 3, 4, 5, 5, 3, 4, 3, 4, 3, 3]}, "YungGawd": {"period": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], "cumPts": [6.5, 13.5, 17.5, 25.0, 32.0, 33.0, 37.0, 45.0, 51.5, 54.5, 56.5, 60.5, 63.5, 68.5, 75.5, 82.5, 90.5, 92.0], "cumW": [6.0, 13.0, 17.0, 24.0, 31.0, 32.0, 36.0, 44.0, 50.0, 52.0, 54.0, 58.0, 61.0, 66.0, 72.0, 79.0, 87.0, 88.0], "cumL": [3.0, 6.0, 12.0, 14.0, 17.0, 26.0, 32.0, 34.0, 37.0, 43.0, 51.0, 57.0, 64.0, 69.0, 71.0, 74.0, 76.0, 84.0], "cumT": [1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 2.0, 3.0, 5.0, 5.0, 5.0, 5.0, 5.0, 7.0, 7.0, 7.0, 8.0], "weeklyPts": [6.5, 7.0, 4.0, 7.5, 7.0, 1.0, 4.0, 8.0, 6.5, 3.0, 2.0, 4.0, 3.0, 5.0, 7.0, 7.0, 8.0, 1.5], "rank": [2, 1, 2, 2, 2, 2, 5, 2, 2, 2, 4, 6, 6, 8, 6, 6, 4, 5]}}, "final_standings": [["CardinalsRow", 107.0, 64.0, 9.0, 111.5], ["1899 Cleveland Spiders", 104.0, 70.0, 6.0, 107.0], ["You\u2019re Killing Me Smalls", 97.0, 73.0, 10.0, 102.0], ["Funky Butt Loving", 91.0, 81.0, 8.0, 95.0], ["YungGawd", 88.0, 84.0, 8.0, 92.0], ["Seantjml", 82.0, 88.0, 10.0, 87.0], ["Bungo", 80.0, 95.0, 5.0, 82.5], ["Juiced Balls and Corked Bats", 75.0, 92.0, 13.0, 81.5], ["SlickyRicky2000", 73.0, 94.0, 13.0, 79.5], ["Twill03", 58.0, 114.0, 8.0, 62.0]], "weekly_matrix": {"1899 Cleveland Spiders": [5.0, 4.0, 6.0, 4.0, 6.5, 4.0, 3.0, 5.0, 5.0, 6.0, 3.5, 6.0, 8.5, 7.0, 6.5, 9.0, 9.0, 9.0], "Bungo": [4.0, 6.5, 2.5, 6.0, 3.0, 2.5, 6.0, 7.0, 2.0, 3.0, 4.0, 5.0, 1.5, 4.0, 8.0, 3.0, 5.5, 9.0], "CardinalsRow": [6.0, 5.0, 9.0, 7.5, 9.5, 6.0, 5.5, 8.0, 3.5, 7.0, 7.0, 6.5, 6.0, 2.5, 3.5, 2.5, 8.0, 8.5], "Funky Butt Loving": [6.5, 6.0, 2.5, 7.0, 3.0, 7.5, 8.0, 2.0, 4.0, 6.0, 6.5, 4.0, 8.5, 5.0, 2.0, 9.0, 2.0, 5.5], "Juiced Balls and Corked Bats": [5.5, 7.0, 1.0, 3.0, 5.5, 9.0, 6.0, 3.0, 5.0, 4.5, 8.0, 3.5, 1.5, 6.5, 3.0, 4.0, 4.5, 1.0], "Seantjml": [3.5, 3.0, 7.5, 3.5, 0.5, 5.5, 4.0, 5.0, 3.0, 4.0, 8.0, 5.0, 10.0, 7.5, 8.0, 6.0, 1.0, 2.0], "SlickyRicky2000": [3.5, 3.5, 3.5, 2.5, 4.5, 4.5, 7.0, 5.5, 6.0, 7.0, 6.0, 8.0, 4.0, 3.5, 2.0, 1.0, 3.0, 4.5], "Twill03": [4.5, 5.0, 6.5, 6.5, 3.5, 2.5, 2.0, 2.0, 8.0, 5.5, 3.0, 2.0, 0.0, 3.0, 4.0, 1.0, 2.0, 1.0], "You\u2019re Killing Me Smalls": [5.0, 3.0, 7.5, 2.5, 7.0, 7.5, 4.5, 4.5, 7.0, 4.0, 2.0, 6.0, 7.0, 6.0, 6.0, 7.5, 7.0, 8.0], "YungGawd": [6.5, 7.0, 4.0, 7.5, 7.0, 1.0, 4.0, 8.0, 6.5, 3.0, 2.0, 4.0, 3.0, 5.0, 7.0, 7.0, 8.0, 1.5]}, "consistency": [["SlickyRicky2000", 1.81, 4.42], ["You\u2019re Killing Me Smalls", 1.82, 5.67], ["1899 Cleveland Spiders", 1.9, 5.94], ["CardinalsRow", 2.08, 6.19], ["Bungo", 2.1, 4.58], ["Twill03", 2.12, 3.44], ["Juiced Balls and Corked Bats", 2.22, 4.53], ["Funky Butt Loving", 2.26, 5.28], ["YungGawd", 2.27, 5.11], ["Seantjml", 2.54, 4.83]], "extra": {"most_improved": ["1899 Cleveland Spiders", 2.45], "most_declined": ["Twill03", -2.11], "hottest_last3": ["1899 Cleveland Spiders", 9.0, 3.06], "coldest_last3": ["Twill03", 1.33, -2.11], "margin_lead": 4.5, "margin_last_place": 17.5}}
+</script>
+
+<script>
+(function () {
+  const DATA = JSON.parse(document.getElementById('seasonData').textContent);
+  const teams = DATA.teams;
+  const n = DATA.n_periods;
+  const cum = DATA.cum;
+  const finalStandings = DATA.final_standings;
+  const weekly = DATA.weekly_matrix;
+  const consistency = DATA.consistency;
+  const extra = DATA.extra;
+
+  const rankByTeam = {};
+  finalStandings.forEach((row, i) => { rankByTeam[row[0]] = i + 1; });
+  const orderedByStanding = finalStandings.map(r => r[0]);
+
+  const NS = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  function fmt1(v) { return (Math.round(v * 10) / 10).toFixed(1); }
+
+  // ---------- Theme ----------
+  const btn = document.getElementById('themeToggle');
+  let dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  function applyTheme() {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    btn.textContent = dark ? 'Light' : 'Dark';
+  }
+  btn.addEventListener('click', () => { dark = !dark; applyTheme(); });
+  applyTheme();
+
+  // ---------- KPI row ----------
+  const leader = finalStandings[0];
+  const kpis = [
+    { label: 'League leader', value: leader[0], sub: `${leader[1]|0}-${leader[2]|0}-${leader[3]|0} · ${fmt1(leader[4])} pts` },
+    { label: 'Closest race (1st vs 2nd)', value: `${extra.margin_lead} pts`, sub: `${finalStandings[0][0]} over ${finalStandings[1][0]}` },
+    { label: 'Hottest last 3 weeks', value: extra.hottest_last3[0], sub: `${extra.hottest_last3[1]} pts/wk (+${extra.hottest_last3[2]})`, cls: 'good' },
+    { label: 'Coldest last 3 weeks', value: extra.coldest_last3[0], sub: `${extra.coldest_last3[1]} pts/wk (${extra.coldest_last3[2]})`, cls: 'bad' },
+    { label: 'Most consistent', value: consistency[0][0], sub: `σ = ${consistency[0][1]} pts/wk` },
+  ];
+  const kpiRow = document.getElementById('kpiRow');
+  kpis.forEach(k => {
+    const tile = document.createElement('div'); tile.className = 'kpi-tile';
+    const l = document.createElement('div'); l.className = 'label'; l.textContent = k.label;
+    const v = document.createElement('div'); v.className = 'value'; v.textContent = k.value;
+    const s = document.createElement('div'); s.className = 'sub' + (k.cls ? ' ' + k.cls : ''); s.textContent = k.sub;
+    tile.appendChild(l); tile.appendChild(v); tile.appendChild(s);
+    kpiRow.appendChild(tile);
+  });
+
+  // ================= Generic touch-friendly line chart =================
+  function buildLineChart(cfg) {
+    const svg = document.getElementById(cfg.svgId);
+    const tip = document.getElementById(cfg.tipId);
+    const legendWrap = document.getElementById(cfg.legendId);
+    const W = cfg.w, H = cfg.h, M = cfg.margin;
+    const plotW = W - M.left - M.right, plotH = H - M.top - M.bottom;
+
+    const x = p => M.left + (plotW * (p - 1)) / (n - 1);
+    const y = v => cfg.yInvert
+      ? M.top + (plotH * (v - cfg.yDomain[0])) / (cfg.yDomain[1] - cfg.yDomain[0])
+      : M.top + plotH - (plotH * (v - cfg.yDomain[0])) / (cfg.yDomain[1] - cfg.yDomain[0]);
+
+    cfg.yTicks.forEach(t => {
+      svg.appendChild(el('line', { class: 'gridline', x1: M.left, x2: W - M.right, y1: y(t.v), y2: y(t.v) }));
+      const lab = el('text', { class: 'axis-label', x: M.left - 6, y: y(t.v) + 3, 'text-anchor': 'end' });
+      lab.textContent = t.label; svg.appendChild(lab);
+    });
+    cfg.xTicks.forEach(p => {
+      const lab = el('text', { class: 'axis-label', x: x(p), y: H - M.bottom + 15, 'text-anchor': 'middle' });
+      lab.textContent = p; svg.appendChild(lab);
+    });
+    svg.appendChild(el('line', { class: 'axis-line', x1: M.left, x2: W - M.right, y1: M.top + plotH, y2: M.top + plotH }));
+
+    const crosshair = el('line', { class: 'crosshair', x1: M.left, x2: M.left, y1: M.top, y2: M.top + plotH });
+    svg.appendChild(crosshair);
+
+    const lineEls = {}, dotEls = {}, labelEls = {};
+    teams.forEach(t => {
+      const pts = cfg.getSeries(t);
+      const d = pts.map((v, i) => (i === 0 ? 'M' : 'L') + x(v.p).toFixed(2) + ',' + y(v.v).toFixed(2)).join(' ');
+      const path = el('path', { class: 'series-line', d });
+      svg.appendChild(path);
+      lineEls[t] = path;
+      const lastPt = pts[pts.length - 1];
+      const dot = el('circle', { class: 'end-dot', cx: x(lastPt.p), cy: y(lastPt.v), r: 4 });
+      svg.appendChild(dot); dotEls[t] = dot;
+      const label = el('text', { class: 'end-label', x: Math.min(x(lastPt.p) + 7, W - M.right - 2), y: y(lastPt.v) + 4 });
+      label.textContent = cfg.endLabel(lastPt.v);
+      svg.appendChild(label); labelEls[t] = label;
+    });
+
+    const hitRect = el('rect', { class: 'hit-area', x: M.left, y: M.top, width: plotW, height: plotH, fill: 'transparent' });
+    svg.appendChild(hitRect);
+
+    let pinned = cfg.defaultTeam || null;
+
+    function refreshHighlight() {
+      const h = pinned;
+      teams.forEach(t => {
+        const on = (t === h);
+        lineEls[t].classList.toggle('active', on);
+        lineEls[t].classList.toggle('dim', !!h && !on);
+        dotEls[t].classList.toggle('show', on);
+        labelEls[t].classList.toggle('show', on);
+        if (on) { lineEls[t].parentNode.appendChild(lineEls[t]); }
+      });
+      Array.from(legendWrap.children).forEach(row => {
+        row.classList.toggle('pinned', row.dataset.team === pinned);
+      });
+    }
+
+    teams.slice().sort((a, b) => rankByTeam[a] - rankByTeam[b]).forEach(t => {
+      const row = document.createElement('button');
+      row.type = 'button'; row.className = 'legend-item'; row.dataset.team = t;
+      const rank = document.createElement('span'); rank.className = 'legend-rank'; rank.textContent = '#' + rankByTeam[t];
+      const key = document.createElement('span'); key.className = 'legend-key';
+      const name = document.createElement('span'); name.textContent = t;
+      row.appendChild(rank); row.appendChild(key); row.appendChild(name);
+      row.addEventListener('click', () => { pinned = (pinned === t) ? null : t; refreshHighlight(); });
+      legendWrap.appendChild(row);
+    });
+    refreshHighlight();
+
+    function positionTooltipAt(p) {
+      crosshair.setAttribute('x1', x(p)); crosshair.setAttribute('x2', x(p));
+      crosshair.style.opacity = 1;
+
+      const rows = teams.map(t => {
+        const series = cfg.getSeries(t);
+        const pt = series.find(s => s.p === p) || series[series.length - 1];
+        return { t, v: pt.v };
+      }).sort((a, b) => cfg.sortAsc ? a.v - b.v : b.v - a.v);
+
+      tip.innerHTML = '';
+      const title = document.createElement('div'); title.className = 't-title';
+      title.textContent = 'Week ' + p; tip.appendChild(title);
+      rows.forEach(r => {
+        const row = document.createElement('div'); row.className = 't-row' + (r.t === pinned ? ' hi' : '');
+        const key = document.createElement('span'); key.className = 't-key';
+        key.style.background = (r.t === pinned) ? 'var(--series-1)' : 'var(--line-muted)';
+        const name = document.createElement('span'); name.className = 't-name'; name.textContent = r.t;
+        const val = document.createElement('span'); val.className = 't-val'; val.textContent = cfg.tooltipVal(r.v);
+        row.appendChild(key); row.appendChild(name); row.appendChild(val);
+        tip.appendChild(row);
+      });
+      tip.classList.add('show');
+      const wrap = svg.closest('.chart-wrap');
+      const wrapRect = wrap.getBoundingClientRect();
+      const svgRect = svg.getBoundingClientRect();
+      const scale = svgRect.width / W;
+      let left = (x(p) * scale) - 90;
+      left = Math.max(4, Math.min(left, wrapRect.width - 252));
+      tip.style.left = left + 'px';
+      tip.style.top = '2px';
+    }
+
+    function handlePointer(evX) {
+      const r = svg.getBoundingClientRect();
+      const scale = W / r.width;
+      const relX = (evX - r.left) * scale - M.left;
+      let p = Math.round(1 + (relX / plotW) * (n - 1));
+      p = Math.max(1, Math.min(n, p));
+      positionTooltipAt(p);
+    }
+    hitRect.addEventListener('pointerdown', (e) => { handlePointer(e.clientX); });
+    hitRect.addEventListener('pointermove', (e) => { if (e.buttons === 1 || e.pointerType === 'mouse') handlePointer(e.clientX); });
+    document.addEventListener('pointerdown', (e) => {
+      const wrap = svg.closest('.chart-wrap');
+      if (!wrap.contains(e.target)) { tip.classList.remove('show'); crosshair.style.opacity = 0; }
+    });
+  }
+
+  const standingsMax = Math.max(...teams.map(t => Math.max(...cum[t].cumPts))) * 1.05;
+  const standingsCeil = Math.ceil(standingsMax / 20) * 20;
+  buildLineChart({
+    svgId: 'chartStandings', tipId: 'tipStandings', legendId: 'legendStandings',
+    w: 380, h: 260, margin: { top: 12, right: 30, bottom: 26, left: 32 },
+    yDomain: [0, standingsCeil], yInvert: false,
+    yTicks: [0, standingsCeil/2, standingsCeil].map(v => ({ v, label: v })),
+    xTicks: [1, 4, 7, 10, 13, 16, 18],
+    getSeries: t => cum[t].period.map((p, i) => ({ p, v: cum[t].cumPts[i] })),
+    endLabel: v => fmt1(v),
+    tooltipVal: v => fmt1(v) + ' pts',
+    defaultTeam: leader[0],
+  });
+
+  buildLineChart({
+    svgId: 'chartRank', tipId: 'tipRank', legendId: 'legendRank',
+    w: 380, h: 280, margin: { top: 12, right: 26, bottom: 26, left: 26 },
+    yDomain: [1, 10], yInvert: true,
+    yTicks: [1, 3, 5, 7, 10].map(v => ({ v, label: v === 1 ? '1st' : v === 10 ? '10th' : v })),
+    xTicks: [1, 4, 7, 10, 13, 16, 18],
+    getSeries: t => cum[t].period.map((p, i) => ({ p, v: cum[t].rank[i] })),
+    endLabel: v => '#' + v,
+    tooltipVal: v => '#' + v,
+    sortAsc: true,
+    defaultTeam: leader[0],
+  });
+
+  // ================= Heatmap (native scroll, HTML cells) =================
+  (function () {
+    const labelsWrap = document.getElementById('heatLabels');
+    const grid = document.getElementById('heatGrid');
+    const periodsWrap = document.getElementById('heatPeriods');
+    const scrollWrap = document.getElementById('heatScroll');
+    const tip = document.getElementById('tipHeat');
+    grid.style.gridTemplateRows = `repeat(${teams.length}, 25px)`;
+    grid.style.gridTemplateColumns = `repeat(${n}, 25px)`;
+
+    const stops = [
+      { s: 0, c: [205, 226, 251] },
+      { s: 0.5, c: [110, 168, 236] },
+      { s: 1, c: [37, 106, 191] },
+    ];
+    function colorFor(v, min, max) {
+      const t = Math.max(0, Math.min(1, (v - min) / (max - min)));
+      let a = stops[0], b = stops[1];
+      if (t > 0.5) { a = stops[1]; b = stops[2]; }
+      const localT = a.s === b.s ? 0 : (t - a.s) / (b.s - a.s);
+      const r = Math.round(a.c[0] + (b.c[0] - a.c[0]) * localT);
+      const g = Math.round(a.c[1] + (b.c[1] - a.c[1]) * localT);
+      const bl = Math.round(a.c[2] + (b.c[2] - a.c[2]) * localT);
+      return `rgb(${r},${g},${bl})`;
+    }
+    let minV = Infinity, maxV = -Infinity;
+    teams.forEach(t => weekly[t].forEach(v => { if (v !== null) { minV = Math.min(minV, v); maxV = Math.max(maxV, v); } }));
+
+    orderedByStanding.forEach(t => {
+      const rowLabel = document.createElement('div'); rowLabel.className = 'heat-label-row'; rowLabel.textContent = t;
+      labelsWrap.appendChild(rowLabel);
+    });
+
+    // column-major fill to match grid-auto-flow: column
+    orderedByStanding.forEach((t, ri) => {
+      weekly[t].forEach((v, ci) => {
+        const cell = document.createElement('div'); cell.className = 'heat-cell';
+        cell.style.gridRow = ri + 1; cell.style.gridColumn = ci + 1;
+        if (v !== null) cell.style.background = colorFor(v, minV, maxV);
+        else cell.style.background = 'transparent';
+        function showTip(clientX, clientY) {
+          if (v === null) return;
+          tip.innerHTML = '';
+          const title = document.createElement('div'); title.className = 't-title'; title.textContent = t;
+          tip.appendChild(title);
+          const row1 = document.createElement('div'); row1.className = 't-row';
+          row1.innerHTML = '<span class="t-name">Week ' + (ci + 1) + '</span>';
+          tip.appendChild(row1);
+          const row2 = document.createElement('div'); row2.className = 't-row';
+          row2.innerHTML = '<span class="t-name">Points earned</span><span class="t-val">' + fmt1(v) + '</span>';
+          tip.appendChild(row2);
+          tip.classList.add('show');
+          const wrap = cell.closest('.chart-wrap');
+          const wrapRect = wrap.getBoundingClientRect();
+          let left = clientX - wrapRect.left - 90;
+          left = Math.max(4, Math.min(left, wrapRect.width - 252));
+          tip.style.left = left + 'px';
+          tip.style.top = '2px';
+        }
+        cell.addEventListener('pointerdown', (e) => showTip(e.clientX, e.clientY));
+        grid.appendChild(cell);
+      });
+    });
+    document.addEventListener('pointerdown', (e) => {
+      const wrap = grid.closest('.chart-wrap');
+      if (!wrap.contains(e.target)) tip.classList.remove('show');
+    });
+
+    for (let p = 1; p <= n; p++) {
+      const lab = document.createElement('div'); lab.className = 'heat-p-label'; lab.textContent = p;
+      periodsWrap.appendChild(lab);
+    }
+    periodsWrap.style.width = (n * 25) + 'px';
+    grid.style.width = (n * 25) + 'px';
+    scrollWrap.addEventListener('scroll', () => {
+      periodsWrap.style.transform = `translateX(-${scrollWrap.scrollLeft}px)`;
+    });
+  })();
+
+  // ================= Consistency bar chart =================
+  (function () {
+    const wrap = document.getElementById('barRows');
+    const maxSd = Math.max(...consistency.map(c => c[1])) * 1.15;
+    const tip = document.getElementById('tipBar');
+    consistency.forEach(([t, sd, avg]) => {
+      const row = document.createElement('div'); row.className = 'bar-row';
+      const label = document.createElement('div'); label.className = 'bar-label'; label.textContent = t;
+      const track = document.createElement('div'); track.className = 'bar-track';
+      const fill = document.createElement('div'); fill.className = 'bar-fill';
+      fill.style.width = (sd / maxSd * 100) + '%';
+      const val = document.createElement('div'); val.className = 'bar-value'; val.textContent = 'σ ' + sd.toFixed(2);
+      track.appendChild(fill);
+      row.appendChild(label); row.appendChild(track); row.appendChild(val);
+      row.addEventListener('pointerdown', (e) => {
+        tip.innerHTML = '';
+        const title = document.createElement('div'); title.className = 't-title'; title.textContent = t;
+        tip.appendChild(title);
+        const r1 = document.createElement('div'); r1.className = 't-row';
+        r1.innerHTML = '<span class="t-name">Weekly std. deviation</span><span class="t-val">' + sd.toFixed(2) + '</span>';
+        const r2 = document.createElement('div'); r2.className = 't-row';
+        r2.innerHTML = '<span class="t-name">Avg pts / week</span><span class="t-val">' + avg.toFixed(2) + '</span>';
+        tip.appendChild(r1); tip.appendChild(r2);
+        tip.classList.add('show');
+        const wrap2 = row.closest('.chart-wrap');
+        const wrapRect = wrap2.getBoundingClientRect();
+        let left = e.clientX - wrapRect.left - 90;
+        left = Math.max(4, Math.min(left, wrapRect.width - 252));
+        tip.style.left = left + 'px';
+        tip.style.top = Math.max(0, row.offsetTop - 8) + 'px';
+      });
+      wrap.appendChild(row);
+    });
+    document.addEventListener('pointerdown', (e) => {
+      const w2 = wrap.closest('.chart-wrap');
+      if (!w2.contains(e.target)) tip.classList.remove('show');
+    });
+  })();
+
+  // ================= Data tables =================
+  function buildTable(containerId, headers, rows) {
+    const container = document.getElementById(containerId);
+    const table = document.createElement('table'); table.className = 'data-table';
+    const thead = document.createElement('thead'); const trh = document.createElement('tr');
+    headers.forEach(h => { const th = document.createElement('th'); th.textContent = h; trh.appendChild(th); });
+    thead.appendChild(trh); table.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+      r.forEach(c => { const td = document.createElement('td'); td.textContent = c; tr.appendChild(td); });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    container.appendChild(table);
+  }
+
+  buildTable('tableStandings', ['Team', ...Array.from({length:n},(_,i)=>'P'+(i+1))],
+    orderedByStanding.map(t => [t, ...cum[t].cumPts.map(fmt1)]));
+  buildTable('tableHeat', ['Team', ...Array.from({length:n},(_,i)=>'P'+(i+1))],
+    orderedByStanding.map(t => [t, ...weekly[t].map(v => v===null?'–':fmt1(v))]));
+  buildTable('tableRank', ['Team', ...Array.from({length:n},(_,i)=>'P'+(i+1))],
+    orderedByStanding.map(t => [t, ...cum[t].rank]));
+  buildTable('tableBar', ['Team', 'Std. deviation (pts/wk)', 'Avg pts/wk'],
+    consistency.map(([t, sd, avg]) => [t, sd.toFixed(2), avg.toFixed(2)]));
+
+  // ================= Recommendations text =================
+  function firstPeriodOfCurrentRank1Streak(team) {
+    const arr = cum[team].rank, per = cum[team].period;
+    let idx = arr.length - 1;
+    while (idx >= 0 && arr[idx] === 1) idx--;
+    return per[idx + 1];
+  }
+  function trailingStreakAtRank(team, rank) {
+    const arr = cum[team].rank;
+    let streak = 0;
+    for (let i = arr.length - 1; i >= 0 && arr[i] === rank; i--) streak++;
+    return streak;
+  }
+  const cellar = finalStandings[finalStandings.length - 1];
+  const second9th = finalStandings[finalStandings.length - 2];
+  const leadSince = firstPeriodOfCurrentRank1Streak(leader[0]);
+  const cellarStreak = trailingStreakAtRank(cellar[0], 10);
+  const gapLeaderCellar = fmt1(leader[4] - cellar[4]);
+  const gap9th = fmt1(leader[4] - second9th[4]);
+
+  const recText = document.getElementById('recText');
+  const p1 = document.createElement('p');
+  p1.innerHTML = `<b>${leader[0]}</b> and <b>${finalStandings[1][0]}</b> have separated from the pack — ${extra.margin_lead} points apart at the top, with ${leader[0]} in 1st place every week since scoring period ${leadSince}. At the bottom, <b>${cellar[0]}</b> has finished last in ${cellarStreak} straight scoring periods and trails the leader by ${gapLeaderCellar} points; <b>${second9th[0]}</b> has been more up-and-down but still sits ${gap9th} points back in 9th.`;
+  const p2 = document.createElement('p');
+  p2.innerHTML = `<b>${extra.most_improved[0]}</b> is the league's best second-half story: their weekly average is up ${extra.most_improved[1]} points from the first half to the second, and they're the hottest team over the last three weeks (${extra.hottest_last3[1]} pts/wk). <b>${extra.most_declined[0]}</b> has trended the other way, down ${Math.abs(extra.most_declined[1])} points per week from first half to second, and is the coldest team down the stretch.`;
+  const p3 = document.createElement('p');
+  p3.innerHTML = `<b>${consistency[0][0]}</b> and <b>${consistency[1][0]}</b> have been the steadiest week to week (lowest standard deviation) — useful for playoff seeding, since a consistent team is less likely to have a disaster week when it counts. Teams with high variance are more of a coin flip in any single week.`;
+  const p4 = document.createElement('p');
+  p4.innerHTML = `A few things worth adding once more of the season (and the playoffs) are in: a category-by-category trend view (OBP, ERA, WHIP, saves+holds); a head-to-head matchup log once weekly opponents are available in the export; and re-sharing this after each new scoring period to keep the standings race and rank chart current.`;
+  recText.appendChild(p1); recText.appendChild(p2); recText.appendChild(p3); recText.appendChild(p4);
+})();
+</script>
+</body>
+</html>
