@@ -289,7 +289,7 @@
 
   // ---------- Theme ----------
   const btn = document.getElementById('themeToggle');
-  let dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  let dark = false; // default to light mode regardless of OS preference; toggle still available
   function applyTheme() {
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
     btn.textContent = dark ? 'Light' : 'Dark';
